@@ -83,6 +83,10 @@ x, y, z = split_points(points)
 fig = plt.figure(figsize=(8, 8))
 ax = plt.axes(projection="3d")
 
+ax.set_xlabel("x", fontsize=24)
+ax.set_ylabel("y", fontsize=24)
+ax.set_zlabel("z", fontsize=24)
+
 ax.scatter(plan.subject.x, plan.subject.y, plan.subject.z, c="blue")
 ax.scatter(plan.camera.x, plan.camera.y, plan.camera.z, c="blue", s=100)
 ax.plot(x, y, z, ".r-")
