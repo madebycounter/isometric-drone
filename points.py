@@ -1,5 +1,5 @@
-from email.mime import base
 from vectors import Vector as Vec
+import plotly.graph_objects as go
 import math
 
 
@@ -26,25 +26,25 @@ def split_points(array):
 
 
 def calculate(plan):
-    offset = plan.camera - plan.subject
+    offset = plan.subject - plan.camera
     theta = math.asin(offset.z / offset.size())
-    heading = math.atan2(offset.y, offset.z)
+    heading = math.atan2(offset.y, offset.x)
 
     points = []
 
     Nx = math.floor(plan.fov.width / plan.step) + 1
-    Nz = math.floor(plan.fov.height / plan.step) + 1
+    Ny = math.floor(plan.fov.height / plan.step) + 1
 
     for x in range(Nx):
-        for z in range(Nz):
-            posn = Vec(x, 0, z)
+        for y in range(Ny):
+            posn = Vec(x, y, 0)
             if x % 2 != 0:
-                posn.z = Nz - z - 1
+                posn.y = Ny - y - 1
 
             # Place point at origin
             posn *= plan.step
             posn.x -= plan.fov.width / 2
-            posn.z -= plan.fov.height / 2
+            posn.y -= plan.fov.height / 2
 
             # Adjust X rotation of plane
             dist = Vec(posn.z, posn.y).size()
@@ -53,7 +53,7 @@ def calculate(plan):
 
             # Adjust Z rotation of plane
             dist = Vec(posn.x, posn.y).size()
-            angle = math.atan2(posn.y, posn.x) + heading - (math.pi / 2)
+            angle = math.atan2(posn.y, posn.x) + heading + (math.pi / 2)
             posn = Vec(dist * math.cos(angle), dist * math.sin(angle), posn.z)
 
             # Translate point to camera
@@ -64,31 +64,63 @@ def calculate(plan):
     return points
 
 
+def plot(plan, points):
+    x, y, z = split_points(points)
+
+    flight_path = go.Scatter3d(
+        x=x,
+        y=y,
+        z=z,
+        marker=dict(
+            size=1,
+            color=list(range(len(x))),
+        ),
+        line=dict(color="darkblue", width=1),
+    )
+
+    x0, y0, z0 = plan.camera.x, plan.camera.y, plan.camera.z
+    x1, y1, z1 = plan.subject.x, plan.subject.y, plan.subject.z
+
+    subject_arrow = go.Scatter3d(
+        x=[x0, x1],
+        y=[y0, y1],
+        z=[z0, z1],
+        mode="lines",
+        line=dict(width=2, color="red"),
+    )
+
+    fig = go.Figure(data=[flight_path, subject_arrow])
+
+    # https://stackoverflow.com/questions/66789390/draw-an-arrow-between-two-specific-points-in-a-scatter-plot-with-plotly-graph-ob
+    arrow_tip_ratio = 0.05
+    arrow_starting_ratio = 0.98
+
+    fig.add_trace(
+        go.Cone(
+            x=[x0 + arrow_starting_ratio * (x1 - x0)],
+            y=[y0 + arrow_starting_ratio * (y1 - y0)],
+            z=[z0 + arrow_starting_ratio * (z1 - z0)],
+            u=[arrow_tip_ratio * (x1 - x0)],
+            v=[arrow_tip_ratio * (y1 - y0)],
+            w=[arrow_tip_ratio * (z1 - z0)],
+            showlegend=False,
+            showscale=False,
+            colorscale=[[0, "red"], [1, "red"]],
+        )
+    )
+
+    return fig
+
+
 plan = FlightPlan(
-    subject=Vec(0, 0, 0),
-    camera=Vec(10, 15, 10),
+    subject=Vec(0, 5, 0),
+    camera=Vec(30, 40, 10),
     fov=Vec(12, 8),
-    step=1,
+    step=0.5,
     theta=math.radians(0),
 )
 
 points = calculate(plan)
+figure = plot(plan, points)
 
-
-import numpy as np
-import matplotlib.pyplot as plt
-
-x, y, z = split_points(points)
-
-fig = plt.figure(figsize=(8, 8))
-ax = plt.axes(projection="3d")
-
-ax.set_xlabel("x", fontsize=24)
-ax.set_ylabel("y", fontsize=24)
-ax.set_zlabel("z", fontsize=24)
-
-ax.scatter(plan.subject.x, plan.subject.y, plan.subject.z, c="blue")
-ax.scatter(plan.camera.x, plan.camera.y, plan.camera.z, c="blue", s=100)
-ax.plot(x, y, z, ".r-")
-
-plt.show()
+figure.show()
